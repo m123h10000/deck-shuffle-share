@@ -1,63 +1,48 @@
+<!-- index.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Deck Shuffle Share</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      padding: 20px;
-      max-width: 600px;
-      margin: auto;
-    }
-    textarea {
-      width: 100%;
-      height: 100px;
-      font-family: monospace;
-      font-size: 16px;
-    }
-    .deck {
-      margin-top: 20px;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 5px;
-    }
-    .card {
-      width: 40px;
-      height: 60px;
-      border: 1px solid #444;
-      border-radius: 4px;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      font-weight: bold;
-      background: white;
-      user-select: none;
-    }
-    .share-link {
-      margin-top: 20px;
-      word-break: break-all;
-    }
-    button {
-      margin-top: 10px;
-      padding: 10px 15px;
-      font-size: 16px;
-    }
+    body { font-family: Arial, sans-serif; padding: 20px; max-width: 700px; margin: auto; }
+    textarea { width: 100%; height: 100px; font-family: monospace; font-size: 16px; }
+    .deck { margin-top: 20px; display: flex; flex-wrap: wrap; gap: 5px; }
+    .card { width: 40px; height: 60px; border: 1px solid #444; border-radius: 4px; display: flex; justify-content: center; align-items: center; font-weight: bold; background: white; user-select: none; }
+    .share-link { margin-top: 20px; word-break: break-word; }
+    button { margin-top: 10px; padding: 10px 15px; font-size: 16px; }
+    .top-bar { margin-bottom: 20px; font-weight: bold; font-size: 18px; }
   </style>
 </head>
 <body>
+  <div class="top-bar">
+    <span id="claimedCounter">0</span> of the 80,658,175,170,943,878,571,660,636,856,403,766,975,289,505,440,883,277,824,000,000,000,000 cards claimed
+  </div>
+
   <h1>Deck Shuffle Share</h1>
   <p>Enter your deck shuffle (space-separated cards, e.g. AS 2D 3H ...)</p>
   <textarea id="deckInput" placeholder="Enter 52 cards here"></textarea><br>
   <button id="saveBtn">Save Shuffle & Get Shareable Link</button>
   <div class="share-link" id="shareLink"></div>
   <div class="deck" id="deckDisplay"></div>
+  <br>
+  <a href="decks.html"><button>View All Submitted Decks</button></a>
 
   <script>
+    const validSuits = ['S', 'H', 'D', 'C'];
+    const validRanks = ['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
+    const claimedDecksKey = 'claimedDecks';
+
     function parseDeck(str) {
-      const cards = str.trim().split(/\s+/);
+      const cards = str.trim().toUpperCase().split(/\s+/);
       if (cards.length !== 52) return null;
+      const seen = new Set();
+      for (const card of cards) {
+        if (!/^([2-9]|10|[AJQK])[SHDC]$/.test(card)) return null;
+        if (seen.has(card)) return null;
+        seen.add(card);
+      }
       return cards;
     }
 
@@ -65,7 +50,7 @@
       const container = document.getElementById('deckDisplay');
       container.innerHTML = '';
       if (!cards) {
-        container.textContent = 'Invalid deck (must be exactly 52 cards).';
+        container.textContent = 'Invalid deck (must be 52 unique cards like "AS 2H 3D ...").';
         return;
       }
       cards.forEach(card => {
@@ -83,12 +68,44 @@
     function decodeDeck(encoded) {
       encoded = encoded.replace(/-/g, '+').replace(/_/g, '/');
       while (encoded.length % 4) encoded += '=';
-      try {
-        return atob(encoded);
-      } catch {
-        return null;
-      }
+      try { return atob(encoded); } catch { return null; }
     }
+
+    function getClaimedDecks() {
+      return JSON.parse(localStorage.getItem(claimedDecksKey) || '{}');
+    }
+
+    function saveDeck(deckStr) {
+      const decks = getClaimedDecks();
+      decks[deckStr] = (decks[deckStr] || 0) + 1;
+      localStorage.setItem(claimedDecksKey, JSON.stringify(decks));
+      updateClaimedCounter();
+    }
+
+    function updateClaimedCounter() {
+      const decks = getClaimedDecks();
+      document.getElementById('claimedCounter').textContent = Object.keys(decks).length;
+    }
+
+    document.getElementById('saveBtn').onclick = () => {
+      const input = document.getElementById('deckInput').value;
+      const cards = parseDeck(input);
+      if (!cards) {
+        alert('Invalid deck. Make sure you use 52 unique cards like "AS 2H 3D ..."');
+        return;
+      }
+      const deckStr = cards.join(' ');
+      const decks = getClaimedDecks();
+      if (deckStr in decks) {
+        alert(`This deck has already been claimed ${decks[deckStr]} time(s). You can still claim it again.`);
+      }
+      saveDeck(deckStr);
+      const encoded = encodeDeck(deckStr);
+      const url = `${window.location.origin}${window.location.pathname}#deck=${encoded}`;
+      document.getElementById('shareLink').innerHTML = `Shareable link:<br><a href="${url}" target="_blank">${url}</a>`;
+      displayDeck(cards);
+      window.history.replaceState(null, '', `#deck=${encoded}`);
+    };
 
     function loadDeckFromURL() {
       if (window.location.hash.startsWith('#deck=')) {
@@ -102,21 +119,8 @@
       }
     }
 
-    document.getElementById('saveBtn').onclick = () => {
-      const input = document.getElementById('deckInput').value;
-      const cards = parseDeck(input);
-      if (!cards) {
-        alert('Please enter exactly 52 cards separated by spaces.');
-        return;
-      }
-      const encoded = encodeDeck(input);
-      const url = `${window.location.origin}${window.location.pathname}#deck=${encoded}`;
-      document.getElementById('shareLink').innerHTML = `Shareable link:<br><a href="${url}" target="_blank">${url}</a>`;
-      displayDeck(cards);
-      window.history.replaceState(null, '', `#deck=${encoded}`);
-    };
-
     loadDeckFromURL();
+    updateClaimedCounter();
   </script>
 </body>
 </html>
