@@ -1,123 +1,77 @@
-<!-- decks.html (Firebase-powered) -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Claimed Decks</title>
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-    import { getDatabase, ref, get, child } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Deck Shuffle Share - Claimed Decks</title>
+<style>
+  body { font-family: Arial, sans-serif; max-width: 800px; margin: auto; padding: 20px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+  th, td { border: 1px solid #ccc; padding: 8px; text-align: left; font-family: monospace; }
+  th { background: #eee; }
+</style>
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import {
+    getDatabase,
+    ref,
+    get,
+    child
+  } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyBjsJu63FalxTjNrrK3ihgscKRo57Tiznc",
-      authDomain: "deck-shuffle-share.firebaseapp.com",
-      databaseURL: "https://deck-shuffle-share-default-rtdb.firebaseio.com",
-      projectId: "deck-shuffle-share",
-      storageBucket: "deck-shuffle-share.firebasestorage.app",
-      messagingSenderId: "836908034519",
-      appId: "1:836908034519:web:6925418aa1b3c510100392"
-    };
+  const firebaseConfig = {
+    apiKey: "AIzaSyBjsJu63FalxTjNrrK3ihgscKRo57Tiznc",
+    authDomain: "deck-shuffle-share.firebaseapp.com",
+    databaseURL: "https://deck-shuffle-share-default-rtdb.firebaseio.com",
+    projectId: "deck-shuffle-share",
+    storageBucket: "deck-shuffle-share.firebasestorage.app",
+    messagingSenderId: "836908034519",
+    appId: "1:836908034519:web:6925418aa1b3c510100392"
+  };
 
-    const app = initializeApp(firebaseConfig);
-    const db = getDatabase(app);
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
 
-    const decksPerPage = 50;
-    let allDecks = [];
-    let filteredDecks = [];
-    let currentPage = 1;
-
-    function renderPage() {
-      const deckList = document.getElementById('deckList');
-      deckList.innerHTML = '';
-      const start = (currentPage - 1) * decksPerPage;
-      const end = start + decksPerPage;
-      const pageDecks = filteredDecks.slice(start, end);
-
-      if (pageDecks.length === 0) {
-        deckList.innerHTML = '<p>No decks found.</p>';
-      } else {
-        pageDecks.forEach(({ deck, count }) => {
-          const div = document.createElement('div');
-          div.className = 'deck-item';
-          div.textContent = `Deck (${count} claim${count > 1 ? 's' : ''}): ${deck}`;
-          deckList.appendChild(div);
-        });
+  async function loadDecks() {
+    const decksRef = ref(db, 'decks');
+    try {
+      const snapshot = await get(decksRef);
+      if (!snapshot.exists()) {
+        document.getElementById('deckList').textContent = 'No decks found.';
+        return;
       }
-
-      document.getElementById('pageIndicator').textContent = `Page ${currentPage} of ${Math.ceil(filteredDecks.length / decksPerPage)}`;
-    }
-
-    function prevPage() {
-      if (currentPage > 1) {
-        currentPage--;
-        renderPage();
+      const decks = snapshot.val();
+      const tbody = document.getElementById('deckBody');
+      tbody.innerHTML = '';
+      for (const [deckStr, claimCount] of Object.entries(decks)) {
+        const tr = document.createElement('tr');
+        const tdDeck = document.createElement('td');
+        tdDeck.textContent = deckStr;
+        const tdCount = document.createElement('td');
+        tdCount.textContent = claimCount;
+        tr.appendChild(tdDeck);
+        tr.appendChild(tdCount);
+        tbody.appendChild(tr);
       }
+    } catch (e) {
+      console.error(e);
+      document.getElementById('deckList').textContent = 'Error loading decks.';
     }
+  }
 
-    function nextPage() {
-      if (currentPage * decksPerPage < filteredDecks.length) {
-        currentPage++;
-        renderPage();
-      }
-    }
-
-    function filterDecks() {
-      const term = document.getElementById('searchInput').value.trim().toUpperCase();
-      if (term === '') return;
-      filteredDecks = allDecks.filter(d => d.deck === term);
-      currentPage = 1;
-      renderPage();
-    }
-
-    function resetSearch() {
-      document.getElementById('searchInput').value = '';
-      filteredDecks = [...allDecks];
-      currentPage = 1;
-      renderPage();
-    }
-
-    function loadDecksFromFirebase() {
-      get(child(ref(db), 'decks')).then((snapshot) => {
-        if (snapshot.exists()) {
-          const data = snapshot.val();
-          allDecks = Object.entries(data).map(([deck, count]) => ({ deck, count }));
-          filteredDecks = [...allDecks];
-          renderPage();
-        } else {
-          document.getElementById('deckList').innerHTML = '<p>No decks found.</p>';
-        }
-      });
-    }
-
-    window.prevPage = prevPage;
-    window.nextPage = nextPage;
-    window.filterDecks = filterDecks;
-    window.resetSearch = resetSearch;
-
-    window.addEventListener('DOMContentLoaded', loadDecksFromFirebase);
-  </script>
-  <style>
-    body { font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: auto; }
-    .deck-item { margin: 10px 0; padding: 10px; border: 1px solid #ccc; border-radius: 5px; background: #f9f9f9; }
-    .controls { margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; }
-    input[type="text"] { padding: 5px; font-size: 16px; flex: 1; }
-    button { padding: 10px 15px; font-size: 16px; }
-    .pagination { margin-top: 20px; display: flex; justify-content: center; gap: 10px; }
-  </style>
+  window.addEventListener('DOMContentLoaded', () => {
+    loadDecks();
+  });
+</script>
 </head>
 <body>
-  <h1>Claimed Decks</h1>
-  <div class="controls">
-    <input type="text" id="searchInput" placeholder="Search decks (exact match)...">
-    <button onclick="filterDecks()">Search</button>
-    <button onclick="resetSearch()">Reset</button>
-  </div>
-  <div id="deckList"></div>
-  <div class="pagination">
-    <button onclick="prevPage()">← Previous</button>
-    <span id="pageIndicator"></span>
-    <button onclick="nextPage()">Next →</button>
-  </div>
+<h1>Deck Shuffle Share - Claimed Decks</h1>
+<table>
+  <thead>
+    <tr><th>Deck (52 cards)</th><th>Claims</th></tr>
+  </thead>
+  <tbody id="deckBody"></tbody>
+</table>
+<div id="deckList"></div>
 </body>
 </html>
