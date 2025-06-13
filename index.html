@@ -33,8 +33,15 @@
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
-    // 52! total possible decks as a string
-    const totalDecks = "80,658,175,170,943,878,571,660,636,856,403,766,975,289,505,440,883,277,824,000,000,000,000";
+   const totalDecksStr = "80,658,175,170,943,878,571,660,636,856,403,766,975,289,505,440,883,277,824,000,000,000,000";
+const totalDecksBigInt = BigInt(totalDecksStr.replace(/,/g, ""));
+
+function updateClaimedCounter(claimedCount) {
+  const claimedBigInt = BigInt(claimedCount);
+  const percentage = Number((claimedBigInt * 100000000n) / totalDecksBigInt) / 1000000;
+  const counterText = `${claimedCount} of the ${totalDecksStr} card combinations claimed (${percentage.toFixed(6)}%)`;
+  document.getElementById('claimedCounter').textContent = counterText;
+}
 
     // Validate deck input
     function parseDeck(str) {
