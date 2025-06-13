@@ -1,138 +1,241 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Deck Shuffle Share - Save Deck</title>
-  <style>
-    body { font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; }
-    textarea { width: 100%; height: 100px; font-family: monospace; font-size: 16px; }
-    button { margin-top: 10px; padding: 10px 15px; font-size: 16px; }
-    .message { margin-top: 15px; font-weight: bold; }
-    #claimedCounter { font-weight: bold; margin-bottom: 15px; }
-  </style>
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-    import {
-      getDatabase,
-      ref,
-      runTransaction,
-      onValue
-    } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Deck Shuffle Share</title>
+<style>
+  body {
+    background-color: #0B610B; /* poker table green */
+    color: #EEE;
+    font-family: Arial, sans-serif;
+    padding: 20px;
+    max-width: 600px;
+    margin: auto;
+  }
+  textarea {
+    width: 100%;
+    height: 100px;
+    font-family: monospace;
+    font-size: 16px;
+    border-radius: 8px;
+    border: 1.5px solid #333;
+    padding: 10px;
+  }
+  .deck {
+    margin-top: 20px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+  .card {
+    width: 40px;
+    height: 60px;
+    border: 1.5px solid #333;
+    border-radius: 8px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: bold;
+    font-size: 18px;
+    box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
+    user-select: none;
+  }
+  .card.red {
+    color: #D32F2F; /* red for hearts and diamonds */
+  }
+  .card.black {
+    color: #000;
+    background: white;
+  }
+  button {
+    margin-top: 10px;
+    padding: 12px 20px;
+    font-weight: bold;
+    font-size: 16px;
+    cursor: pointer;
+    border-radius: 12px;
+    border: none;
+    background: linear-gradient(145deg, #FFFFFF, #C0C0C0);
+    box-shadow: 3px 3px 5px #666;
+    transition: all 0.3s ease;
+  }
+  button:hover {
+    background: linear-gradient(145deg, #E0E0E0, #A0A0A0);
+    box-shadow: 5px 5px 10px #444;
+  }
+  .share-link {
+    margin-top: 20px;
+    word-break: break-all;
+    color: #eee;
+  }
+  #claimedCounter {
+    font-weight: bold;
+    font-size: 18px;
+    margin-bottom: 15px;
+  }
+</style>
+</head>
+<body>
+  <h1>Deck Shuffle Share</h1>
 
+  <p id="claimedCounter">Loading claimed decks count...</p>
+
+  <p>Enter your deck shuffle (space-separated cards, e.g. AS 2D 3H ...)</p>
+  <textarea id="deckInput" placeholder="Enter 52 cards here"></textarea><br />
+  <button id="saveBtn">Claim Deck</button>
+
+  <div class="share-link" id="shareLink"></div>
+
+  <div class="deck" id="deckDisplay"></div>
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+
+  <script>
+    // Your Firebase config
     const firebaseConfig = {
       apiKey: "AIzaSyBjsJu63FalxTjNrrK3ihgscKRo57Tiznc",
       authDomain: "deck-shuffle-share.firebaseapp.com",
       databaseURL: "https://deck-shuffle-share-default-rtdb.firebaseio.com",
       projectId: "deck-shuffle-share",
-      storageBucket: "deck-shuffle-share.firebasestorage.app",
+      storageBucket: "deck-shuffle-share.appspot.com",
       messagingSenderId: "836908034519",
       appId: "1:836908034519:web:6925418aa1b3c510100392"
     };
+    // Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
 
-    const app = initializeApp(firebaseConfig);
-    const db = getDatabase(app);
+    // Total decks as string and BigInt for calculations
+    const totalDecksStr = "80,658,175,170,943,878,571,660,636,856,403,766,975,289,505,440,883,277,824,000,000,000,000";
+    const totalDecksBigInt = BigInt(totalDecksStr.replace(/,/g, ""));
 
-   const totalDecksStr = "80,658,175,170,943,878,571,660,636,856,403,766,975,289,505,440,883,277,824,000,000,000,000";
-const totalDecksBigInt = BigInt(totalDecksStr.replace(/,/g, ""));
-
-function updateClaimedCounter(claimedCount) {
-  const claimedBigInt = BigInt(claimedCount);
-  const percentage = Number((claimedBigInt * 100000000n) / totalDecksBigInt) / 1000000;
-  const counterText = `${claimedCount} of the ${totalDecksStr} card combinations claimed (${percentage.toFixed(6)}%)`;
-  document.getElementById('claimedCounter').textContent = counterText;
-}
-
-    // Validate deck input
+    // Parse deck string into array, validate 52 cards
     function parseDeck(str) {
-      const cards = str.trim().toUpperCase().split(/\s+/);
+      const cards = str.trim().split(/\s+/);
       if (cards.length !== 52) return null;
 
-      const ranks = new Set(['2','3','4','5','6','7','8','9','10','J','Q','K','A']);
-      const suits = new Set(['C','D','H','S']);
-
-      for (const c of cards) {
-        let rank, suit;
-        if (c.length === 3) {
-          rank = c.slice(0, 2);
-          suit = c[2];
-        } else if (c.length === 2) {
-          rank = c[0];
-          suit = c[1];
-        } else {
-          return null;
-        }
-        if (!ranks.has(rank) || !suits.has(suit)) return null;
+      // Validate each card format (simple validation)
+      const validRanks = /^(A|2|3|4|5|6|7|8|9|10|J|Q|K)$/;
+      const validSuits = /^[CDHS]$/i; // Clubs, Diamonds, Hearts, Spades
+      for (let card of cards) {
+        let rank = card.slice(0, -1).toUpperCase();
+        let suit = card.slice(-1).toUpperCase();
+        if (!validRanks.test(rank) || !validSuits.test(suit)) return null;
       }
-
-      if ((new Set(cards)).size !== 52) return null;
-
       return cards;
     }
 
-    async function claimDeck(deckStr) {
-      const deckRef = ref(db, 'decks/' + deckStr);
+    // Display deck visually with colors
+    function displayDeck(cards) {
+      const container = document.getElementById('deckDisplay');
+      container.innerHTML = '';
+      if (!cards) {
+        container.textContent = 'Invalid deck (must be exactly 52 valid cards).';
+        return;
+      }
+      cards.forEach(card => {
+        const div = document.createElement('div');
+        div.className = 'card';
+        const suit = card.slice(-1).toUpperCase();
+        if (suit === 'H' || suit === 'D') {
+          div.classList.add('red');
+        } else {
+          div.classList.add('black');
+        }
+        div.textContent = card.toUpperCase();
+        container.appendChild(div);
+      });
+    }
+
+    // Encode deck string to base64 URI safe
+    function encodeDeck(str) {
+      return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    }
+    // Decode base64 URI safe to deck string
+    function decodeDeck(encoded) {
+      encoded = encoded.replace(/-/g, '+').replace(/_/g, '/');
+      while (encoded.length % 4) {
+        encoded += '=';
+      }
       try {
-        const result = await runTransaction(deckRef, current => {
-          if (current === null) return 1;
-          return current + 1;
-        });
-        return result.snapshot.val();
-      } catch (e) {
-        console.error(e);
+        return atob(encoded);
+      } catch {
         return null;
       }
     }
 
-    // Update live claimed deck count at top
-    function updateClaimedCount() {
-      const decksRef = ref(db, 'decks');
-      onValue(decksRef, (snapshot) => {
-        const data = snapshot.val();
-        let count = 0;
-        if (data) {
-          count = Object.keys(data).length;
-        }
-        document.getElementById('claimedCounter').textContent =
-          `${count} of the ${totalDecks} combinations claimed`;
+    // Update claimed decks counter text with percentage
+    function updateClaimedCounter(claimedCount) {
+      const claimedBigInt = BigInt(claimedCount);
+      const percentage = Number((claimedBigInt * 100000000n) / totalDecksBigInt) / 1000000;
+      const counterText = `${claimedCount} of the ${totalDecksStr} card combinations claimed (${percentage.toFixed(6)}%)`;
+      document.getElementById('claimedCounter').textContent = counterText;
+    }
+
+    // Load decks count from Firebase and listen for changes live
+    function listenForClaimedCount() {
+      const decksRef = db.ref('decks');
+      decksRef.on('value', snapshot => {
+        const decksData = snapshot.val() || {};
+        const claimedCount = Object.keys(decksData).length;
+        updateClaimedCounter(claimedCount);
       });
     }
 
-    window.addEventListener('DOMContentLoaded', () => {
-      updateClaimedCount();
+    // Load deck from URL hash if present
+    function loadDeckFromURL() {
+      if (window.location.hash.startsWith('#deck=')) {
+        const encoded = window.location.hash.slice(6);
+        const deckStr = decodeDeck(encoded);
+        const cards = parseDeck(deckStr);
+        if (cards) {
+          document.getElementById('deckInput').value = deckStr;
+          displayDeck(cards);
+        }
+      }
+    }
 
-      const input = document.getElementById('deckInput');
-      const msg = document.getElementById('message');
-      const btn = document.getElementById('saveBtn');
+    // On Save button click handler
+    document.getElementById('saveBtn').onclick = async () => {
+      const input = document.getElementById('deckInput').value.trim();
+      const cards = parseDeck(input);
+      if (!cards) {
+        alert('Please enter exactly 52 valid cards separated by spaces. Format example: AS 2D 3H ...');
+        return;
+      }
+      // Deck key is the input string normalized to uppercase (no spaces trimmed inside, for uniqueness)
+      const deckKey = input.toUpperCase();
 
-      btn.onclick = async () => {
-        const val = input.value.trim().toUpperCase();
-        const cards = parseDeck(val);
-        if (!cards) {
-          msg.textContent = 'Invalid deck! Must be 52 unique valid cards (e.g. AS 2D 3H ...).';
-          return;
-        }
-        msg.textContent = 'Saving deck...';
-        const count = await claimDeck(val);
-        if (count === null) {
-          msg.textContent = 'Error saving deck.';
-          return;
-        }
-        if (count === 1) {
-          msg.textContent = 'Deck claimed for the first time!';
-        } else {
-          msg.textContent = `Deck already claimed before. You have claimed it again! Total claims: ${count}`;
-        }
-      };
-    });
+      // Check if deck exists already
+      const deckRef = db.ref('decks/' + deckKey);
+      const snapshot = await deckRef.get();
+      if (snapshot.exists()) {
+        // Deck already claimed - increment claim count
+        const currentCount = snapshot.val().count || 1;
+        await deckRef.update({ count: currentCount + 1 });
+        alert(`This deck was already claimed by others. Your claim has been added! Total claims: ${currentCount + 1}`);
+      } else {
+        // New deck - create with count 1
+        await deckRef.set({ count: 1 });
+        alert('Deck claimed successfully!');
+      }
+
+      // Update UI
+      const encoded = encodeDeck(input);
+      const url = `${window.location.origin}${window.location.pathname}#deck=${encoded}`;
+      document.getElementById('shareLink').innerHTML = `Shareable link:<br><a href="${url}" target="_blank">${url}</a>`;
+      displayDeck(cards);
+
+      // Update URL without reload for bookmarking
+      window.history.replaceState(null, '', `#deck=${encoded}`);
+    };
+
+    // On page load:
+    loadDeckFromURL();
+    listenForClaimedCount();
   </script>
-</head>
-<body>
-  <h1>Deck Shuffle Share - Save Deck</h1>
-  <div id="claimedCounter">Loading claimed decks count...</div>
-  <textarea id="deckInput" placeholder="Enter 52 cards like 'AS 2D 3H ...'"></textarea><br />
-  <button id="saveBtn">Claim Deck</button>
-  <div class="message" id="message"></div>
-  <p><a href="decks.html">View Claimed Decks</a></p>
 </body>
 </html>
