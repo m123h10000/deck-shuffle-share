@@ -9,16 +9,17 @@
     textarea { width: 100%; height: 100px; font-family: monospace; font-size: 16px; }
     button { margin-top: 10px; padding: 10px 15px; font-size: 16px; }
     .message { margin-top: 15px; font-weight: bold; }
+    #claimedCounter { font-weight: bold; margin-bottom: 15px; }
   </style>
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import {
       getDatabase,
       ref,
-      runTransaction
+      runTransaction,
+      onValue
     } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
-    // Your Firebase config here
     const firebaseConfig = {
       apiKey: "AIzaSyBjsJu63FalxTjNrrK3ihgscKRo57Tiznc",
       authDomain: "deck-shuffle-share.firebaseapp.com",
@@ -32,29 +33,31 @@
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
-    // Parse and validate deck string (must have 52 unique valid cards)
+    // 52! total possible decks as a string
+    const totalDecks = "80,658,175,170,943,878,571,660,636,856,403,766,975,289,505,440,883,277,824,000,000,000,000";
+
+    // Validate deck input
     function parseDeck(str) {
       const cards = str.trim().toUpperCase().split(/\s+/);
       if (cards.length !== 52) return null;
 
       const ranks = new Set(['2','3','4','5','6','7','8','9','10','J','Q','K','A']);
-      const suits = new Set(['C','D','H','S']); // Clubs, Diamonds, Hearts, Spades
+      const suits = new Set(['C','D','H','S']);
 
       for (const c of cards) {
         let rank, suit;
-        if (c.length === 3) { // 10C, 10D etc
+        if (c.length === 3) {
           rank = c.slice(0, 2);
           suit = c[2];
         } else if (c.length === 2) {
           rank = c[0];
           suit = c[1];
         } else {
-          return null; // invalid card length
+          return null;
         }
         if (!ranks.has(rank) || !suits.has(suit)) return null;
       }
 
-      // Check for duplicates
       if ((new Set(cards)).size !== 52) return null;
 
       return cards;
@@ -74,7 +77,23 @@
       }
     }
 
+    // Update live claimed deck count at top
+    function updateClaimedCount() {
+      const decksRef = ref(db, 'decks');
+      onValue(decksRef, (snapshot) => {
+        const data = snapshot.val();
+        let count = 0;
+        if (data) {
+          count = Object.keys(data).length;
+        }
+        document.getElementById('claimedCounter').textContent =
+          `${count} of the ${totalDecks} combinations claimed`;
+      });
+    }
+
     window.addEventListener('DOMContentLoaded', () => {
+      updateClaimedCount();
+
       const input = document.getElementById('deckInput');
       const msg = document.getElementById('message');
       const btn = document.getElementById('saveBtn');
@@ -103,6 +122,7 @@
 </head>
 <body>
   <h1>Deck Shuffle Share - Save Deck</h1>
+  <div id="claimedCounter">Loading claimed decks count...</div>
   <textarea id="deckInput" placeholder="Enter 52 cards like 'AS 2D 3H ...'"></textarea><br />
   <button id="saveBtn">Claim Deck</button>
   <div class="message" id="message"></div>
