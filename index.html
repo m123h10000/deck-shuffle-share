@@ -1,0 +1,109 @@
+!DOCTYPE html
+html lang=en
+head
+  meta charset=UTF-8 
+  meta name=viewport content=width=device-width, initial-scale=1 
+  titleDeck Shuffle Sharetitle
+  style
+    body { font-family Arial, sans-serif; padding 20px; max-width 600px; margin auto; }
+    textarea { width 100%; height 100px; font-family monospace; font-size 16px; }
+    .deck { margin-top 20px; display flex; flex-wrap wrap; gap 5px; }
+    .card {
+      width 40px; height 60px; border 1px solid #444; border-radius 4px;
+      display flex; justify-content center; align-items center; font-weight bold;
+      background white; user-select none;
+    }
+    .share-link { margin-top 20px; word-break break-all; }
+    button { margin-top 10px; padding 10px 15px; font-size 16px; }
+  style
+head
+body
+
+h1Deck Shuffle Shareh1
+pEnter your deck shuffle (space-separated cards, e.g. AS 2D 3H ...)p
+
+textarea id=deckInput placeholder=Enter 52 cards heretextarea
+br 
+button id=saveBtnSave Shuffle & Get Shareable Linkbutton
+
+div class=share-link id=shareLinkdiv
+
+div class=deck id=deckDisplaydiv
+
+script
+   Parse deck string into array
+  function parseDeck(str) {
+    const cards = str.trim().split(s+);
+    if (cards.length !== 52) return null;
+    return cards;
+  }
+
+   Display deck visually
+  function displayDeck(cards) {
+    const container = document.getElementById('deckDisplay');
+    container.innerHTML = '';
+    if (!cards) {
+      container.textContent = 'Invalid deck (must be exactly 52 cards).';
+      return;
+    }
+    cards.forEach(card = {
+      const div = document.createElement('div');
+      div.className = 'card';
+      div.textContent = card;
+      container.appendChild(div);
+    });
+  }
+
+   Encode deck string to base64 URI safe
+  function encodeDeck(str) {
+    return btoa(str).replace(+g, '-').replace(g, '_').replace(=+$, '');
+  }
+
+   Decode base64 URI safe to deck string
+  function decodeDeck(encoded) {
+    encoded = encoded.replace(-g, '+').replace(_g, '');
+    while (encoded.length % 4) {
+      encoded += '=';
+    }
+    try {
+      return atob(encoded);
+    } catch {
+      return null;
+    }
+  }
+
+   Load deck from URL hash
+  function loadDeckFromURL() {
+    if (window.location.hash.startsWith('#deck=')) {
+      const encoded = window.location.hash.slice(6);
+      const deckStr = decodeDeck(encoded);
+      const cards = parseDeck(deckStr);
+      if (cards) {
+        document.getElementById('deckInput').value = deckStr;
+        displayDeck(cards);
+      }
+    }
+  }
+
+   On Save button click
+  document.getElementById('saveBtn').onclick = () = {
+    const input = document.getElementById('deckInput').value;
+    const cards = parseDeck(input);
+    if (!cards) {
+      alert('Please enter exactly 52 cards separated by spaces.');
+      return;
+    }
+    const encoded = encodeDeck(input);
+    const url = `${window.location.origin}${window.location.pathname}#deck=${encoded}`;
+    document.getElementById('shareLink').innerHTML = `Shareable linkbra href=${url} target=_blank${url}a`;
+    displayDeck(cards);
+     Optional Update URL in browser for bookmarking
+    window.history.replaceState(null, '', `#deck=${encoded}`);
+  };
+
+   On page load, try to load deck from URL hash
+  loadDeckFromURL();
+script
+
+body
+html
