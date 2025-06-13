@@ -1,0 +1,101 @@
+<!-- decks.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Claimed Decks</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: auto; }
+    .deck-item { margin: 10px 0; padding: 10px; border: 1px solid #ccc; border-radius: 5px; background: #f9f9f9; }
+    .controls { margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; }
+    input[type="text"] { padding: 5px; font-size: 16px; flex: 1; }
+    button { padding: 10px 15px; font-size: 16px; }
+    .pagination { margin-top: 20px; display: flex; justify-content: center; gap: 10px; }
+  </style>
+</head>
+<body>
+  <h1>Claimed Decks</h1>
+  <div class="controls">
+    <input type="text" id="searchInput" placeholder="Search decks (exact match)...">
+    <button onclick="filterDecks()">Search</button>
+    <button onclick="resetSearch()">Reset</button>
+  </div>
+  <div id="deckList"></div>
+  <div class="pagination">
+    <button onclick="prevPage()">← Previous</button>
+    <span id="pageIndicator"></span>
+    <button onclick="nextPage()">Next →</button>
+  </div>
+
+  <script>
+    const decksPerPage = 50;
+    let decks = [];
+    let filteredDecks = [];
+    let currentPage = 1;
+
+    function loadDecks() {
+      const stored = localStorage.getItem('claimedDecks');
+      if (stored) {
+        const obj = JSON.parse(stored);
+        decks = Object.entries(obj).map(([deck, count]) => ({ deck, count }));
+        filteredDecks = [...decks];
+        renderPage();
+      }
+    }
+
+    function renderPage() {
+      const list = document.getElementById('deckList');
+      list.innerHTML = '';
+
+      const start = (currentPage - 1) * decksPerPage;
+      const end = start + decksPerPage;
+      const pageDecks = filteredDecks.slice(start, end);
+
+      if (pageDecks.length === 0) {
+        list.innerHTML = '<p>No decks found.</p>';
+      } else {
+        pageDecks.forEach(({ deck, count }) => {
+          const div = document.createElement('div');
+          div.className = 'deck-item';
+          div.textContent = `Deck (${count} claim${count > 1 ? 's' : ''}): ${deck}`;
+          list.appendChild(div);
+        });
+      }
+
+      document.getElementById('pageIndicator').textContent = `Page ${currentPage} of ${Math.ceil(filteredDecks.length / decksPerPage)}`;
+    }
+
+    function prevPage() {
+      if (currentPage > 1) {
+        currentPage--;
+        renderPage();
+      }
+    }
+
+    function nextPage() {
+      if (currentPage * decksPerPage < filteredDecks.length) {
+        currentPage++;
+        renderPage();
+      }
+    }
+
+    function filterDecks() {
+      const term = document.getElementById('searchInput').value.trim().toUpperCase();
+      if (term === '') return;
+      filteredDecks = decks.filter(d => d.deck === term);
+      currentPage = 1;
+      renderPage();
+    }
+
+    function resetSearch() {
+      document.getElementById('searchInput').value = '';
+      filteredDecks = [...decks];
+      currentPage = 1;
+      renderPage();
+    }
+
+    loadDecks();
+  </script>
+</body>
+</html>
