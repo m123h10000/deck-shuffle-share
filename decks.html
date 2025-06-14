@@ -9,14 +9,14 @@
   table { width: 100%; border-collapse: collapse; margin-top: 20px; }
   th, td { border: 1px solid #ccc; padding: 8px; text-align: left; font-family: monospace; }
   th { background: #eee; }
+  #sortContainer { margin-top: 10px; }
 </style>
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
   import {
     getDatabase,
     ref,
-    get,
-    child
+    get
   } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
   const firebaseConfig = {
@@ -31,6 +31,7 @@
 
   const app = initializeApp(firebaseConfig);
   const db = getDatabase(app);
+  let deckArray = [];
 
   async function loadDecks() {
     const decksRef = ref(db, 'decks');
@@ -40,38 +41,89 @@
         document.getElementById('deckList').textContent = 'No decks found.';
         return;
       }
+
       const decks = snapshot.val();
-      const tbody = document.getElementById('deckBody');
-      tbody.innerHTML = '';
-      for (const [deckStr, claimCount] of Object.entries(decks)) {
-        const tr = document.createElement('tr');
-        const tdDeck = document.createElement('td');
-        tdDeck.textContent = deckStr;
-        const tdCount = document.createElement('td');
-        tdCount.textContent = claimCount;
-        tr.appendChild(tdDeck);
-        tr.appendChild(tdCount);
-        tbody.appendChild(tr);
-      }
+      deckArray = Object.entries(decks).map(([deckStr, claimCount]) => ({
+        name: deckStr,
+        claims: claimCount,
+        timestamp: extractTimestamp(deckStr)
+      }));
+
+      sortAndRenderDecks(document.getElementById('sortSelect').value);
     } catch (e) {
       console.error(e);
       document.getElementById('deckList').textContent = 'Error loading decks.';
     }
   }
 
+  function extractTimestamp(deckName) {
+    // Extract numeric timestamp from deck name (e.g., "deck-1718060412345")
+    const match = deckName.match(/\d{13}/);
+    return match ? parseInt(match[0]) : 0;
+  }
+
+  function sortAndRenderDecks(type) {
+    switch (type) {
+      case 'newest':
+        deckArray.sort((a, b) => b.timestamp - a.timestamp);
+        break;
+      case 'oldest':
+        deckArray.sort((a, b) => a.timestamp - b.timestamp);
+        break;
+      case 'alpha':
+        deckArray.sort((a, b) => a.name.localeCompare(b.name));
+        break;
+      case 'mostClaims':
+        deckArray.sort((a, b) => b.claims - a.claims);
+        break;
+      case 'leastClaims':
+        deckArray.sort((a, b) => a.claims - b.claims);
+        break;
+    }
+
+    const tbody = document.getElementById('deckBody');
+    tbody.innerHTML = '';
+    for (const deck of deckArray) {
+      const tr = document.createElement('tr');
+      const tdDeck = document.createElement('td');
+      tdDeck.textContent = deck.name;
+      const tdCount = document.createElement('td');
+      tdCount.textContent = deck.claims;
+      tr.appendChild(tdDeck);
+      tr.appendChild(tdCount);
+      tbody.appendChild(tr);
+    }
+  }
+
   window.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('sortSelect').addEventListener('change', (e) => {
+      sortAndRenderDecks(e.target.value);
+    });
     loadDecks();
   });
 </script>
 </head>
 <body>
 <h1>Deck Shuffle Share - Claimed Decks</h1>
+
+<div id="sortContainer">
+  <label for="sortSelect">Sort by:</label>
+  <select id="sortSelect">
+    <option value="newest">Newest → Oldest</option>
+    <option value="oldest">Oldest → Newest</option>
+    <option value="alpha">Alphabetical</option>
+    <option value="mostClaims">Most Claims</option>
+    <option value="leastClaims">Least Claims</option>
+  </select>
+</div>
+
 <table>
   <thead>
     <tr><th>Deck (52 cards)</th><th>Claims</th></tr>
   </thead>
   <tbody id="deckBody"></tbody>
 </table>
+
 <div id="deckList"></div>
 </body>
 </html>
