@@ -64,14 +64,11 @@
 
   function sortAndRenderDecks(type) {
     switch (type) {
-      case 'newest':
-        deckArray.sort((a, b) => b.timestamp - a.timestamp);
-        break;
-      case 'oldest':
-        deckArray.sort((a, b) => a.timestamp - b.timestamp);
-        break;
       case 'alpha':
         deckArray.sort((a, b) => a.name.localeCompare(b.name));
+        break;
+      case 'alpha':
+        deckArray.sort((a, b) => b.name.localeCompare(a.name));
         break;
       case 'mostClaims':
         deckArray.sort((a, b) => b.claims - a.claims);
