@@ -64,10 +64,10 @@
 
   function sortAndRenderDecks(type) {
     switch (type) {
-      case 'alpha':
+      case 'alphaaz':
         deckArray.sort((a, b) => a.name.localeCompare(b.name));
         break;
-      case 'alpha':
+      case 'alphaza':
         deckArray.sort((a, b) => b.name.localeCompare(a.name));
         break;
       case 'mostClaims':
@@ -106,9 +106,8 @@
 <div id="sortContainer">
   <label for="sortSelect">Sort by:</label>
   <select id="sortSelect">
-    <option value="newest">Newest → Oldest</option>
-    <option value="oldest">Oldest → Newest</option>
-    <option value="alpha">Alphabetical</option>
+    <option value="alphaza">Alphabetical Z-A</option>
+    <option value="alphaaz">Alphabetical A-Z</option>
     <option value="mostClaims">Most Claims</option>
     <option value="leastClaims">Least Claims</option>
   </select>
